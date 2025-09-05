@@ -10,11 +10,6 @@
 static const struct gpio_dt_spec button_0 = GPIO_DT_SPEC_GET_OR(BUTTON_0, gpios, {0});
 static struct gpio_callback button_0_data;
 
-// Button interrupt handler
-void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
-        printk("Button pressed\n");
-}
-
 // Confirgure LED pins
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
@@ -42,7 +37,23 @@ int led_state = 0; // State machine for the LED sequence
 // 1 -> red
 // 2 -> yellow
 // 3 -> green
+// 4 -> pause
 int last_led_state = 0; // Save the last state
+int direction = 0; // Determine if we move from yellow to red (up) or green (down)
+// 1 -> up
+// 2 -> down
+
+// Button interrupt handler
+void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+        printk("Button pressed\n");
+        if (led_state != 4) {
+                last_led_state = led_state;
+                led_state = 4;
+        }
+        else if (led_state == 4) {
+                led_state = last_led_state;
+        }
+}
 
 int main(void)
 {
@@ -124,8 +135,15 @@ void red_led_task(void *, void *, void *) {
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&red, 0); // Set LED off
                         printk("Red off\n");
-                        last_led_state = led_state;
-                        led_state = 2;
+                        direction = 2;
+                        if (led_state == 4) {
+                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                printk("Red on, pausing\n");
+                                k_msleep(100); // Prevent busy-looping
+                        }
+                        else if (led_state != 4) {
+                                led_state = 2;
+                        }
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
@@ -142,15 +160,22 @@ void yellow_led_task(void *, void *, void *) {
                         gpio_pin_set_dt(&red, 0); // Set LED off
                         gpio_pin_set_dt(&green, 0);
                         printk("Yellow off\n");
+                        if (led_state == 4) {
+                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                gpio_pin_set_dt(&green, 1);
+                                printk("Yellow on, pausing\n");
+                                k_msleep(100); // Prevent busy-looping
+                        }
 
-                        // Determine if we move to red or green light next
-                        if (last_led_state == 1) {
-                                led_state = 3;
+                        else if (led_state != 4) {
+                                // Determine if we move to red or green light next
+                                if (direction == 2) {
+                                        led_state = 3;
+                                }
+                                else if (direction == 1) {
+                                        led_state = 1;
+                                }
                         }
-                        else if (last_led_state == 3) {
-                                led_state = 1;
-                        }
-                        
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
@@ -165,8 +190,15 @@ void green_led_task(void *, void *, void *) {
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&green, 0); // Set LED off
                         printk("Green off\n");
-                        last_led_state = led_state;
-                        led_state = 2;
+                        direction = 1;
+                        if (led_state == 4) {
+                                gpio_pin_set_dt(&green, 1); // Set LED on
+                                printk("Green on, pausing\n");
+                                k_msleep(100); // Prevent busy-looping
+                        }
+                        else if (led_state != 4) {
+                                led_state = 2;
+                        }
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
