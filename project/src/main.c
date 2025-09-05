@@ -25,6 +25,7 @@ K_THREAD_DEFINE(yellow_thread,STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIO
 
 // Declare functions and global variables
 int initialize_leds(void);
+int led_state;
 
 int main(void)
 {
@@ -54,6 +55,8 @@ int initialize_leds(void) {
         gpio_pin_set_dt(&red, 0); 
         gpio_pin_set_dt(&green, 0);
 
+        led_state = 0; // Set the state of the LED sequence
+
         printk("LED initialized ok\n");
 
         return 0;
@@ -63,37 +66,46 @@ int initialize_leds(void) {
 void red_led_task(void *, void *, void *) {
         printk("Red LED thread started\n");
         while (true) {
-                gpio_pin_set_dt(&red, 1); // Set LED on
-                printk("Red on");
-                k_sleep(K_SECONDS(1)); // Sleep for 1 second
-                gpio_pin_set_dt(&red, 0); // Set LED off
-                printk("Red off");
-                k_sleep(K_SECONDS(1)); // Sleep for 1 second
-        }
-}
-
-void green_led_task(void *, void *, void *) {
-        printk("Green LED thread started\n");
-        while (true) {
-                gpio_pin_set_dt(&green, 1); // Set LED on
-                printk("Green on");
-                k_sleep(K_SECONDS(1)); // Sleep for 1 second
-                gpio_pin_set_dt(&green, 0); // Set LED off
-                printk("Green off");
-                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                if (led_state == 0) {
+                        gpio_pin_set_dt(&red, 1); // Set LED on
+                        printk("Red on\n");
+                        k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                        gpio_pin_set_dt(&red, 0); // Set LED off
+                        printk("Red off\n");
+                        led_state = 1;
+                }
+                k_yield(); // Yield and move to the end of the task line
         }
 }
 
 void yellow_led_task(void *, void *, void *) {
         printk("Yellow LED thread started\n");
         while (true) {
-                gpio_pin_set_dt(&red, 1); // Set LED on
-                gpio_pin_set_dt(&green, 1);
-                printk("Yellow on");
-                k_sleep(K_SECONDS(1)); // Sleep for 1 second
-                gpio_pin_set_dt(&red, 0); // Set LED off
-                gpio_pin_set_dt(&green, 0);
-                printk("Yellow off");
-                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                if (led_state == 1) {
+                        gpio_pin_set_dt(&red, 1); // Set LED on
+                        gpio_pin_set_dt(&green, 1);
+                        printk("Yellow on\n");
+                        k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                        gpio_pin_set_dt(&red, 0); // Set LED off
+                        gpio_pin_set_dt(&green, 0);
+                        printk("Yellow off\n");
+                        led_state = 2;
+                }
+                k_yield(); // Yield and move to the end of the task line
+        }
+}
+
+void green_led_task(void *, void *, void *) {
+        printk("Green LED thread started\n");
+        while (true) {
+                if (led_state == 2) {
+                        gpio_pin_set_dt(&green, 1); // Set LED on
+                        printk("Green on\n");
+                        k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                        gpio_pin_set_dt(&green, 0); // Set LED off
+                        printk("Green off\n");
+                        led_state = 0;
+                }
+                k_yield(); // Yield and move to the end of the task line
         }
 }
