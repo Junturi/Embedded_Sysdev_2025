@@ -1,7 +1,19 @@
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/printk.h>
+#include <inttypes.h>
+
+// Configure buttons
+#define BUTTON_0 DT_ALIAS(sw0)
+static const struct gpio_dt_spec button_0 = GPIO_DT_SPEC_GET_OR(BUTTON_0, gpios, {0});
+static struct gpio_callback button_0_data;
+
+// Button interrupt handler
+void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+        printk("Button pressed\n");
+}
 
 // Confirgure LED pins
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -24,6 +36,7 @@ void yellow_led_task(void *, void *, void *);
 K_THREAD_DEFINE(yellow_thread,STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
 // Declare functions and global variables
+int initialize_button(void);
 int initialize_leds(void);
 int led_state = 0; // State machine for the LED sequence
 // 1 -> red
@@ -33,10 +46,45 @@ int last_led_state = 0; // Save the last state
 
 int main(void)
 {
-        // In main, we only initialize the LEDs
+        // In main, we only initialize the LEDs and button
         initialize_leds();
 
+        int ret = initialize_button();
+	if (ret < 0) {
+		return 0;
+	}
+
+	while (1) {
+		k_msleep(10); // sleep 10ms
+	}
+
         return 0;
+}
+
+int initialize_button(void) {
+        int ret;
+	if (!gpio_is_ready_dt(&button_0)) {
+		printk("Error: button 0 is not ready\n");
+		return -1;
+	}
+
+	ret = gpio_pin_configure_dt(&button_0, GPIO_INPUT);
+	if (ret != 0) {
+		printk("Error: failed to configure pin\n");
+		return -1;
+	}
+
+	ret = gpio_pin_interrupt_configure_dt(&button_0, GPIO_INT_EDGE_TO_ACTIVE);
+	if (ret != 0) {
+		printk("Error: failed to configure interrupt on pin\n");
+		return -1;
+	}
+
+	gpio_init_callback(&button_0_data, button_0_handler, BIT(button_0.pin));
+	gpio_add_callback(button_0.port, &button_0_data);
+	printk("Set up button 0 ok\n");
+	
+	return 0;
 }
 
 // Initialize LEDs
