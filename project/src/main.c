@@ -6,6 +6,7 @@
 // Confirgure LED pins
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
+static const struct gpio_dt_spec blue = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios);
 
 // Initialize thread definitions for the LEDs
 #define STACKSIZE 500
@@ -19,6 +20,13 @@ K_THREAD_DEFINE(red_thread,STACKSIZE, red_led_task, NULL, NULL, NULL, PRIORITY, 
 void green_led_task(void *, void *, void *);
 K_THREAD_DEFINE(green_thread,STACKSIZE, green_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
+// Initialize blue LED thread
+void blue_led_task(void *, void *, void *);
+K_THREAD_DEFINE(blue_thread,STACKSIZE, blue_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+// Declare functions
+void intialize_leds(void);
+
 int main(void)
 {
         // In main, we only initialize the LEDs
@@ -28,7 +36,7 @@ int main(void)
 }
 
 // Initialize LEDs
-int initialize_leds() {
+int initialize_leds(void) {
 
         // Initialize pins
         int ret = gpio_pin_configure_dt(&red, GPIO_OUTPUT_ACTIVE);
@@ -43,9 +51,16 @@ int initialize_leds() {
                 return ret;
         }
 
+        ret = gpio_pin_configure_dt(&blue, GPIO_OUTPUT_ACTIVE);
+        if (ret <0) {
+                printk("Error: Blue LED configure failed\n");
+                return ret;
+        }
+
         // Set LEDs off
         gpio_pin_set_dt(&red, 0); 
         gpio_pin_set_dt(&green, 0);
+        gpio_pin_set_dt(&blue, 0);
 
         printk("LED initialized ok\n");
 
@@ -57,7 +72,7 @@ void red_led_task(void *, void *, void *) {
         printk("Red LED thread started\n");
         while (true) {
                 gpio_pin_set_dt(&red, 1); // Set LED on
-                printk("Red off");
+                printk("Red on");
                 k_sleep(K_SECONDS(1)); // Sleep for 1 second
                 gpio_pin_set_dt(&red, 0); // Set LED off
                 printk("Red off");
@@ -69,10 +84,22 @@ void green_led_task(void *, void *, void *) {
         printk("Green LED thread started\n");
         while (true) {
                 gpio_pin_set_dt(&green, 1); // Set LED on
-                printk("Green off");
+                printk("Green on");
                 k_sleep(K_SECONDS(1)); // Sleep for 1 second
                 gpio_pin_set_dt(&green, 0); // Set LED off
                 printk("Green off");
+                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+        }
+}
+
+void blue_led_task(void *, void *, void *) {
+        printk("Blue LED thread started\n");
+        while (true) {
+                gpio_pin_set_dt(&blue, 1); // Set LED on
+                printk("Blue on");
+                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                gpio_pin_set_dt(&blue, 0); // Set LED off
+                printk("Blue off");
                 k_sleep(K_SECONDS(1)); // Sleep for 1 second
         }
 }
