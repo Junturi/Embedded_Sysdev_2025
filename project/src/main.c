@@ -1,7 +1,14 @@
 #include <zephyr/kernel.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/sys/printk.h>
+#include <inttypes.h>
+
+// Configure buttons
+#define BUTTON_0 DT_ALIAS(sw0)
+static const struct gpio_dt_spec button_0 = GPIO_DT_SPEC_GET_OR(BUTTON_0, gpios, {0});
+static struct gpio_callback button_0_data;
 
 // Confirgure LED pins
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -24,19 +31,71 @@ void yellow_led_task(void *, void *, void *);
 K_THREAD_DEFINE(yellow_thread,STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
 // Declare functions and global variables
+int initialize_button(void);
 int initialize_leds(void);
 int led_state = 0; // State machine for the LED sequence
 // 1 -> red
 // 2 -> yellow
 // 3 -> green
+// 4 -> pause
 int last_led_state = 0; // Save the last state
+int direction = 0; // Determine if we move from yellow to red (up) or green (down)
+// 1 -> up
+// 2 -> down
+
+// Button interrupt handler
+void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+        printk("Button pressed\n");
+        if (led_state != 4) {
+                last_led_state = led_state;
+                led_state = 4;
+        }
+        else if (led_state == 4) {
+                led_state = last_led_state;
+        }
+}
 
 int main(void)
 {
-        // In main, we only initialize the LEDs
+        // In main, we only initialize the LEDs and button
         initialize_leds();
 
+        int ret = initialize_button();
+	if (ret < 0) {
+		return 0;
+	}
+
+	while (1) {
+		k_msleep(10); // sleep 10ms
+	}
+
         return 0;
+}
+
+int initialize_button(void) {
+        int ret;
+	if (!gpio_is_ready_dt(&button_0)) {
+		printk("Error: button 0 is not ready\n");
+		return -1;
+	}
+
+	ret = gpio_pin_configure_dt(&button_0, GPIO_INPUT);
+	if (ret != 0) {
+		printk("Error: failed to configure pin\n");
+		return -1;
+	}
+
+	ret = gpio_pin_interrupt_configure_dt(&button_0, GPIO_INT_EDGE_TO_ACTIVE);
+	if (ret != 0) {
+		printk("Error: failed to configure interrupt on pin\n");
+		return -1;
+	}
+
+	gpio_init_callback(&button_0_data, button_0_handler, BIT(button_0.pin));
+	gpio_add_callback(button_0.port, &button_0_data);
+	printk("Set up button 0 ok\n");
+	
+	return 0;
 }
 
 // Initialize LEDs
@@ -76,8 +135,15 @@ void red_led_task(void *, void *, void *) {
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&red, 0); // Set LED off
                         printk("Red off\n");
-                        last_led_state = led_state;
-                        led_state = 2;
+                        direction = 2;
+                        if (led_state == 4) {
+                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                printk("Red on, pausing\n");
+                                k_msleep(100); // Prevent busy-looping
+                        }
+                        else if (led_state != 4) {
+                                led_state = 2;
+                        }
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
@@ -94,15 +160,22 @@ void yellow_led_task(void *, void *, void *) {
                         gpio_pin_set_dt(&red, 0); // Set LED off
                         gpio_pin_set_dt(&green, 0);
                         printk("Yellow off\n");
+                        if (led_state == 4) {
+                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                gpio_pin_set_dt(&green, 1);
+                                printk("Yellow on, pausing\n");
+                                k_msleep(100); // Prevent busy-looping
+                        }
 
-                        // Determine if we move to red or green light next
-                        if (last_led_state == 1) {
-                                led_state = 3;
+                        else if (led_state != 4) {
+                                // Determine if we move to red or green light next
+                                if (direction == 2) {
+                                        led_state = 3;
+                                }
+                                else if (direction == 1) {
+                                        led_state = 1;
+                                }
                         }
-                        else if (last_led_state == 3) {
-                                led_state = 1;
-                        }
-                        
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
@@ -117,8 +190,15 @@ void green_led_task(void *, void *, void *) {
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&green, 0); // Set LED off
                         printk("Green off\n");
-                        last_led_state = led_state;
-                        led_state = 2;
+                        direction = 1;
+                        if (led_state == 4) {
+                                gpio_pin_set_dt(&green, 1); // Set LED on
+                                printk("Green on, pausing\n");
+                                k_msleep(100); // Prevent busy-looping
+                        }
+                        else if (led_state != 4) {
+                                led_state = 2;
+                        }
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
