@@ -59,21 +59,38 @@ int last_led_state = 0; // Save the last state
 int direction = 0; // Determine if we move from yellow to red (up) or green (down)
 // 1 -> up
 // 2 -> down
+bool red_led_on = false;
+bool yellow_led_on = false;
+bool green_led_on = false;
 
 // Button interrupt handlers
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 0 pressed\n");
-        if (led_state != 4) {
-                last_led_state = led_state;
-                led_state = 4;
+        if (led_state != 4) { // If the state is not paused
+                last_led_state = led_state; // Save the current state of the light sequence
+                led_state = 4; // Set the state to paused
         }
-        else if (led_state == 4) {
-                led_state = last_led_state;
+        else if (led_state == 4) { // If the state is paused
+                led_state = last_led_state; // Set the current state to last state before pausing
         }
 }
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 1 pressed\n");
+        if (led_state == 4) {
+                gpio_pin_set_dt(&red, 0); 
+                gpio_pin_set_dt(&green, 0);
+                if (red_led_on == false) {
+                        gpio_pin_set_dt(&red, 1); // Set LED on
+                        red_led_on = true;
+                        printk("Red on\n");
+                }
+                else if (red_led_on == true) {
+                        gpio_pin_set_dt(&red, 0); // Set LED off
+                        red_led_on = false;
+                        printk("Red off\n");
+                }                               
+        }
 }
 
 void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -254,9 +271,11 @@ void red_led_task(void *, void *, void *) {
         while (true) {
                 if (led_state == 1) {
                         gpio_pin_set_dt(&red, 1); // Set LED on
+                        red_led_on = true;
                         printk("Red on\n");
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&red, 0); // Set LED off
+                        red_led_on = false;
                         printk("Red off\n");
                         direction = 2;
                         if (led_state == 4) {
@@ -278,10 +297,12 @@ void yellow_led_task(void *, void *, void *) {
                 if (led_state == 2) {
                         gpio_pin_set_dt(&red, 1); // Set LED on
                         gpio_pin_set_dt(&green, 1);
+                        yellow_led_on = true;
                         printk("Yellow on\n");
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&red, 0); // Set LED off
                         gpio_pin_set_dt(&green, 0);
+                        yellow_led_on = false;
                         printk("Yellow off\n");
                         if (led_state == 4) {
                                 gpio_pin_set_dt(&red, 1); // Set LED on
@@ -309,9 +330,11 @@ void green_led_task(void *, void *, void *) {
         while (true) {
                 if (led_state == 3) {
                         gpio_pin_set_dt(&green, 1); // Set LED on
+                        green_led_on = true;
                         printk("Green on\n");
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&green, 0); // Set LED off
+                        green_led_on = false;
                         printk("Green off\n");
                         direction = 1;
                         if (led_state == 4) {
