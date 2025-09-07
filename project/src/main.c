@@ -80,6 +80,8 @@ void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32
         if (led_state == 4) {
                 gpio_pin_set_dt(&red, 0); 
                 gpio_pin_set_dt(&green, 0);
+                yellow_led_on = false;
+                green_led_on = false;
                 if (red_led_on == false) {
                         gpio_pin_set_dt(&red, 1); // Set LED on
                         red_led_on = true;
@@ -95,9 +97,11 @@ void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 2 pressed\n");
-                if (led_state == 4) {
+        if (led_state == 4) {
                 gpio_pin_set_dt(&red, 0); 
                 gpio_pin_set_dt(&green, 0);
+                red_led_on = false;
+                green_led_on = false;
                 if (yellow_led_on == false) {
                         gpio_pin_set_dt(&red, 1); // Set LED on
                         gpio_pin_set_dt(&green, 1);
@@ -115,6 +119,22 @@ void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 3 pressed\n");
+        if (led_state == 4) {
+                gpio_pin_set_dt(&red, 0); 
+                gpio_pin_set_dt(&green, 0);
+                red_led_on = false;
+                yellow_led_on = false;
+                if (green_led_on == false) {
+                        gpio_pin_set_dt(&green, 1); // Set LED on
+                        green_led_on = true;
+                        printk("Green on\n");
+                }
+                else if (green_led_on == true) {
+                        gpio_pin_set_dt(&green, 0); // Set LED off
+                        green_led_on = false;
+                        printk("Green off\n");
+                }                               
+        }
 }
 
 void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -296,6 +316,7 @@ void red_led_task(void *, void *, void *) {
                         direction = 2;
                         if (led_state == 4) {
                                 gpio_pin_set_dt(&red, 1); // Set LED on
+                                red_led_on = true;
                                 printk("Red on, pausing\n");
                                 k_msleep(100); // Prevent busy-looping
                         }
@@ -323,6 +344,7 @@ void yellow_led_task(void *, void *, void *) {
                         if (led_state == 4) {
                                 gpio_pin_set_dt(&red, 1); // Set LED on
                                 gpio_pin_set_dt(&green, 1);
+                                yellow_led_on = true;
                                 printk("Yellow on, pausing\n");
                                 k_msleep(100); // Prevent busy-looping
                         }
@@ -355,6 +377,7 @@ void green_led_task(void *, void *, void *) {
                         direction = 1;
                         if (led_state == 4) {
                                 gpio_pin_set_dt(&green, 1); // Set LED on
+                                green_led_on = true;
                                 printk("Green on, pausing\n");
                                 k_msleep(100); // Prevent busy-looping
                         }
