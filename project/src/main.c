@@ -95,6 +95,22 @@ void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 2 pressed\n");
+                if (led_state == 4) {
+                gpio_pin_set_dt(&red, 0); 
+                gpio_pin_set_dt(&green, 0);
+                if (yellow_led_on == false) {
+                        gpio_pin_set_dt(&red, 1); // Set LED on
+                        gpio_pin_set_dt(&green, 1);
+                        yellow_led_on = true;
+                        printk("Yellow on\n");
+                }
+                else if (yellow_led_on == true) {
+                        gpio_pin_set_dt(&red, 0); // Set LED off
+                        gpio_pin_set_dt(&green, 0);
+                        yellow_led_on = false;
+                        printk("Yellow off\n");
+                }                               
+        }
 }
 
 void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
