@@ -66,6 +66,7 @@ bool button_1_pressed = false; // Boolean variable to track if button is pressed
 bool button_2_pressed = false;
 bool button_3_pressed = false;
 bool button_4_pressed = false;
+bool blink_yellow_led = false;
 
 // Button interrupt handlers
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -77,25 +78,36 @@ void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32
         else if (led_state == 4) { // If the state is paused
                 led_state = last_led_state; // Set the current state to last state before pausing
         }
+        blink_yellow_led = false;
 }
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 1 pressed\n");
         button_1_pressed = true;
+        blink_yellow_led = false;
 }
 
 void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 2 pressed\n");
         button_2_pressed = true;
+        blink_yellow_led = false;
 }
 
 void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 3 pressed\n");
         button_3_pressed = true;
+        blink_yellow_led = false;
 }
 
 void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
-        printk("Button 4 pressed\n");                            
+        printk("Button 4 pressed\n");
+        button_4_pressed = true;  
+        if (blink_yellow_led == false) {
+                blink_yellow_led = true;
+        }
+        else if (blink_yellow_led == true) {
+                blink_yellow_led = false;
+        }                          
 }
 
 int main(void)
@@ -352,6 +364,25 @@ void yellow_led_task(void *, void *, void *) {
                         }
                         button_2_pressed = false;                               
                 }
+                if (led_state == 4 && button_4_pressed == true) {
+                        gpio_pin_set_dt(&red, 0); 
+                        gpio_pin_set_dt(&green, 0);
+                        red_led_on = false;
+                        green_led_on = false;
+                        button_4_pressed = false;
+                        while (blink_yellow_led == true) {
+                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                gpio_pin_set_dt(&green, 1);
+                                yellow_led_on = true;
+                                printk("Yellow on\n");
+                                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                                gpio_pin_set_dt(&red, 0); // Set LED off
+                                gpio_pin_set_dt(&green, 0);
+                                yellow_led_on = false;
+                                printk("Yellow off\n");
+                                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                        }
+                }   
                 k_yield(); // Yield and move to the end of the task line
         }
 }
