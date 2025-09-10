@@ -18,6 +18,19 @@ static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
 void uart_task(void *, void *, void *);
 K_THREAD_DEFINE(uart_thread,STACKSIZE, uart_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
+// Create FIFO buffer
+K_FIFO_DEFINE(data_fifo);
+
+// Create struckt for FIFO data
+struct data_t {
+        void *fifo_reserved;
+        char msg[20];
+};
+
+// Initialize dispatcher thread
+void dispatcher_task(void *, void *, void *);
+K_THREAD_DEFINE(dispatcher_thread,STACKSIZE, dispatcher_task, NULL, NULL, NULL, PRIORITY, 0, 0);
+
 // Configure buttons
 #define BUTTON_0 DT_ALIAS(sw0)
 #define BUTTON_1 DT_ALIAS(sw1)
@@ -296,14 +309,54 @@ int initialize_leds(void) {
         return 0;
 }
 
+void dispatcher_task(void *, void *, void *) {
+        while (true) {
+                // Receive dispatcher data from uart_task FIFO
+                struct data_t * rec_item = k_fifo_get(&data_fifo, K_FOREVER);
+                char sequence[20];
+                memcpy(sequence, rec_item->msg, 20);
+                k_free(rec_item);
+
+                printk("Dispatcher: %s\n", sequence);
+        }
+
+}
+
 void uart_task(void *, void *, void *) {
         char rc=0;
+        char uart_msg[20];
+        memset(uart_msg, 0, 20);
+        int uart_msg_count = 0;
+
 	while (true) {
 		// Ask UART if data available
 		if (uart_poll_in(uart_dev,&rc) == 0) {
-			printk("Received: %c\n",rc);
+                        // If character is not newline, add to UART message buffer
+                        if (rc != '\r') {
+                                uart_msg[uart_msg_count] = rc;
+                                uart_msg_count++;
+                        }
+                        // If character is newline, copy dispatcher data and put to FIFO buffer
+                        else {
+                                printk("UART msg: %s\n", uart_msg);
+
+                                struct data_t *buf = k_malloc(sizeof(struct data_t));
+                                if (buf == NULL) {
+                                        return;
+                                }
+
+                                // Copy UART message to dispatcher data
+                                snprintf(buf->msg, 20, "%s", uart_msg);
+
+                                k_fifo_put(&data_fifo, buf);
+                                printk("Data added to FIFO: %s\n", buf->msg);
+
+                                // Clear UART message buffer
+                                uart_msg_count = 0;
+                                memset(uart_msg, 0, 20);
+                        }
 		}
-		k_yield();
+		k_msleep(10);
 	}
 }
 
