@@ -1,3 +1,6 @@
+// Viikolla 2 tavoittelen pistemäärää 3/3.
+// Kaikki kolme tehtäväosiota on toteutettu ja toimii toivotulla tavalla.
+
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
@@ -66,7 +69,7 @@ bool button_1_pressed = false; // Boolean variable to track if button is pressed
 bool button_2_pressed = false;
 bool button_3_pressed = false;
 bool button_4_pressed = false;
-bool blink_yellow_led = false;
+bool blink_yellow_led = false; // Boolean variable to track if we want to blink the yellow light or not
 
 // Button interrupt handlers
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -83,7 +86,7 @@ void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 1 pressed\n");
-        button_1_pressed = true;
+        button_1_pressed = true; // Set the flags
         blink_yellow_led = false;
 }
 
@@ -102,7 +105,7 @@ void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32
 void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 4 pressed\n");
         button_4_pressed = true;  
-        if (blink_yellow_led == false) {
+        if (blink_yellow_led == false) { // Check if yellow LED is alredy blinking
                 blink_yellow_led = true;
         }
         else if (blink_yellow_led == true) {
@@ -276,39 +279,39 @@ void red_led_task(void *, void *, void *) {
         while (true) {
                 if (led_state == 1) {
                         gpio_pin_set_dt(&red, 1); // Set LED on
-                        red_led_on = true;
+                        red_led_on = true; // Track that the LED is on
                         printk("Red on\n");
                         k_sleep(K_SECONDS(1)); // Sleep for 1 second
                         gpio_pin_set_dt(&red, 0); // Set LED off
-                        red_led_on = false;
+                        red_led_on = false; // Track that the LED is off
                         printk("Red off\n");
-                        direction = 2;
-                        if (led_state == 4) {
-                                gpio_pin_set_dt(&red, 1); // Set LED on
+                        direction = 2; // Track if we are moving up (1, towards red) or down (2, towards green)
+                        if (led_state == 4) { // If the state is 4 = pause
+                                gpio_pin_set_dt(&red, 1); // Set LED on and stay on
                                 red_led_on = true;
                                 printk("Red on, pausing\n");
                                 k_msleep(100); // Prevent busy-looping
                         }
-                        else if (led_state != 4) {
-                                led_state = 2;
+                        else if (led_state != 4) { // If state is not 4
+                                led_state = 2; // Move to the next state
                         }
                 }
-                if (led_state == 4 && button_1_pressed == true) {
-                        gpio_pin_set_dt(&red, 0); 
-                        gpio_pin_set_dt(&green, 0);
-                        yellow_led_on = false;
+                // Turn red LED on or off
+                if (led_state == 4 && button_1_pressed == true) { // If state is 4 and button_1 was pressed 
+                        gpio_pin_set_dt(&green, 0); // Turn off other LED colors
+                        yellow_led_on = false; // Track that other colors are off
                         green_led_on = false;
-                        if (red_led_on == false) {
-                                gpio_pin_set_dt(&red, 1); // Set LED on
+                        if (red_led_on == false) { // If the red LED is not on
+                                gpio_pin_set_dt(&red, 1); // Set LED on and stay on
                                 red_led_on = true;
                                 printk("Red on\n");
                         }
-                        else if (red_led_on == true) {
-                                gpio_pin_set_dt(&red, 0); // Set LED off
+                        else if (red_led_on == true) { // If the red LED is on
+                                gpio_pin_set_dt(&red, 0); // Set LED off and stay off
                                 red_led_on = false;
                                 printk("Red off\n");
                         }
-                        button_1_pressed = false;
+                        button_1_pressed = false; // Set the flag
                 }
                 k_yield(); // Yield and move to the end of the task line
         }
@@ -318,21 +321,21 @@ void yellow_led_task(void *, void *, void *) {
         printk("Yellow LED thread started\n");
         while (true) {
                 if (led_state == 2) {
-                        gpio_pin_set_dt(&red, 1); // Set LED on
+                        gpio_pin_set_dt(&red, 1);
                         gpio_pin_set_dt(&green, 1);
                         yellow_led_on = true;
                         printk("Yellow on\n");
-                        k_sleep(K_SECONDS(1)); // Sleep for 1 second
-                        gpio_pin_set_dt(&red, 0); // Set LED off
+                        k_sleep(K_SECONDS(1));
+                        gpio_pin_set_dt(&red, 0);
                         gpio_pin_set_dt(&green, 0);
                         yellow_led_on = false;
                         printk("Yellow off\n");
                         if (led_state == 4) {
-                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                gpio_pin_set_dt(&red, 1);
                                 gpio_pin_set_dt(&green, 1);
                                 yellow_led_on = true;
                                 printk("Yellow on, pausing\n");
-                                k_msleep(100); // Prevent busy-looping
+                                k_msleep(100);
                         }
 
                         else if (led_state != 4) {
@@ -345,45 +348,47 @@ void yellow_led_task(void *, void *, void *) {
                                 }
                         }
                 }
-                if (led_state == 4 && button_2_pressed == true) {
+                // Turn yellow LED on or off
+                if (led_state == 4 && button_2_pressed == true) { 
                         gpio_pin_set_dt(&red, 0); 
                         gpio_pin_set_dt(&green, 0);
                         red_led_on = false;
                         green_led_on = false;
                         if (yellow_led_on == false) {
-                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                gpio_pin_set_dt(&red, 1);
                                 gpio_pin_set_dt(&green, 1);
                                 yellow_led_on = true;
                                 printk("Yellow on\n");
                         }
                         else if (yellow_led_on == true) {
-                                gpio_pin_set_dt(&red, 0); // Set LED off
+                                gpio_pin_set_dt(&red, 0);
                                 gpio_pin_set_dt(&green, 0);
                                 yellow_led_on = false;
                                 printk("Yellow off\n");
                         }
                         button_2_pressed = false;                               
                 }
-                if (led_state == 4 && button_4_pressed == true) {
+                // Blinking yellow LED mode
+                if (led_state == 4 && button_4_pressed == true) { 
                         gpio_pin_set_dt(&red, 0); 
                         gpio_pin_set_dt(&green, 0);
                         red_led_on = false;
                         green_led_on = false;
                         button_4_pressed = false;
                         while (blink_yellow_led == true) {
-                                gpio_pin_set_dt(&red, 1); // Set LED on
+                                gpio_pin_set_dt(&red, 1);
                                 gpio_pin_set_dt(&green, 1);
                                 yellow_led_on = true;
                                 printk("Yellow on\n");
-                                k_sleep(K_SECONDS(1)); // Sleep for 1 second
-                                gpio_pin_set_dt(&red, 0); // Set LED off
+                                k_sleep(K_SECONDS(1));
+                                gpio_pin_set_dt(&red, 0);
                                 gpio_pin_set_dt(&green, 0);
                                 yellow_led_on = false;
                                 printk("Yellow off\n");
-                                k_sleep(K_SECONDS(1)); // Sleep for 1 second
+                                k_sleep(K_SECONDS(1));
                         }
                 }   
-                k_yield(); // Yield and move to the end of the task line
+                k_yield();
         }
 }
 
@@ -391,42 +396,43 @@ void green_led_task(void *, void *, void *) {
         printk("Green LED thread started\n");
         while (true) {
                 if (led_state == 3) {
-                        gpio_pin_set_dt(&green, 1); // Set LED on
+                        gpio_pin_set_dt(&green, 1);
                         green_led_on = true;
                         printk("Green on\n");
-                        k_sleep(K_SECONDS(1)); // Sleep for 1 second
-                        gpio_pin_set_dt(&green, 0); // Set LED off
+                        k_sleep(K_SECONDS(1));
+                        gpio_pin_set_dt(&green, 0);
                         green_led_on = false;
                         printk("Green off\n");
                         direction = 1;
                         if (led_state == 4) {
-                                gpio_pin_set_dt(&green, 1); // Set LED on
+                                gpio_pin_set_dt(&green, 1);
                                 green_led_on = true;
                                 printk("Green on, pausing\n");
-                                k_msleep(100); // Prevent busy-looping
+                                k_msleep(100);
                         }
                         else if (led_state != 4) {
                                 led_state = 2;
                         }
                 }
 
+                // Turn green LED on or off
                 if (led_state == 4 && button_3_pressed == true) {
                         gpio_pin_set_dt(&red, 0); 
                         gpio_pin_set_dt(&green, 0);
                         red_led_on = false;
                         yellow_led_on = false;
                         if (green_led_on == false) {
-                                gpio_pin_set_dt(&green, 1); // Set LED on
+                                gpio_pin_set_dt(&green, 1);
                                 green_led_on = true;
                                 printk("Green on\n");
                         }
                         else if (green_led_on == true) {
-                                gpio_pin_set_dt(&green, 0); // Set LED off
+                                gpio_pin_set_dt(&green, 0);
                                 green_led_on = false;
                                 printk("Green off\n");
                         }  
                         button_3_pressed = false;                             
                 }
-                k_yield(); // Yield and move to the end of the task line
+                k_yield();
         }
 }
