@@ -1,12 +1,22 @@
-// Viikolla 2 tavoittelen pistemäärää 3/3.
-// Kaikki kolme tehtäväosiota on toteutettu ja toimii toivotulla tavalla.
-
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/printk.h>
 #include <inttypes.h>
+#include <zephyr/drivers/uart.h>
+
+// Initialize thread definitions
+#define STACKSIZE 500
+#define PRIORITY 5
+
+// Configure UART
+#define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
+static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
+
+// Initialize UART thread
+void uart_task(void *, void *, void *);
+K_THREAD_DEFINE(uart_thread,STACKSIZE, uart_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
 // Configure buttons
 #define BUTTON_0 DT_ALIAS(sw0)
@@ -34,10 +44,6 @@ static struct gpio_callback button_4_data;
 static const struct gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec green = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
 
-// Initialize thread definitions for the LEDs
-#define STACKSIZE 500
-#define PRIORITY 5
-
 // Initialize red LED thread
 void red_led_task(void *, void *, void *);
 K_THREAD_DEFINE(red_thread,STACKSIZE, red_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
@@ -53,6 +59,7 @@ K_THREAD_DEFINE(yellow_thread,STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIO
 // Declare functions and global variables
 int initialize_button(void);
 int initialize_leds(void);
+int initialize_uart(void);
 int led_state = 0; // State machine for the LED sequence
 // 1 -> red
 // 2 -> yellow
@@ -115,10 +122,16 @@ void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 int main(void)
 {
-        // In main, we only initialize the LEDs and button
+        // In main, initialize LEDs, buttons, uart
+        int ret = initialize_uart();
+	if (ret != 0) {
+		printk("UART initialization failed!\n");
+		return ret;
+	}
+        
         initialize_leds();
 
-        int ret = initialize_button();
+        ret = initialize_button();
 	if (ret < 0) {
 		return 0;
 	}
@@ -127,6 +140,16 @@ int main(void)
 		k_msleep(10); // sleep 10ms
 	}
 
+        k_msleep(100);
+
+        return 0;
+}
+
+int initialize_uart(void) {
+        // Initialize UART
+        if (!device_is_ready(uart_dev)) {
+                return 1;
+        }
         return 0;
 }
 
@@ -266,11 +289,22 @@ int initialize_leds(void) {
         gpio_pin_set_dt(&red, 0); 
         gpio_pin_set_dt(&green, 0);
 
-        led_state = 1; // Set the state of the LED sequence
+        led_state = 0; // Set the state of the LED sequence
 
         printk("LED initialized ok\n");
 
         return 0;
+}
+
+void uart_task(void *, void *, void *) {
+        char rc=0;
+	while (true) {
+		// Ask UART if data available
+		if (uart_poll_in(uart_dev,&rc) == 0) {
+			printk("Received: %c\n",rc);
+		}
+		k_yield();
+	}
 }
 
 // Task for handling red LED
