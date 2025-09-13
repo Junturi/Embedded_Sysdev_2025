@@ -69,6 +69,12 @@ K_THREAD_DEFINE(green_thread,STACKSIZE, green_led_task, NULL, NULL, NULL, PRIORI
 void yellow_led_task(void *, void *, void *);
 K_THREAD_DEFINE(yellow_thread,STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
+void sequence_task(void *, void *, void *);
+K_THREAD_DEFINE(sequence_thread,STACKSIZE, sequence_task, NULL, NULL, NULL, PRIORITY, 0, 0);
+
+void blink_task(void *, void *, void *);
+K_THREAD_DEFINE(blink_thread,STACKSIZE, blink_task, NULL, NULL, NULL, PRIORITY, 0, 0);
+
 // Declare functions and global variables
 int initialize_button(void);
 int initialize_leds(void);
@@ -81,13 +87,19 @@ K_MUTEX_DEFINE(green_mutex);
 K_CONDVAR_DEFINE(green_signal);
 K_MUTEX_DEFINE(yellow_mutex);
 K_CONDVAR_DEFINE(yellow_signal);
+K_MUTEX_DEFINE(sequence_mutex);
+K_CONDVAR_DEFINE(sequence_signal);
+K_MUTEX_DEFINE(blink_mutex);
+K_CONDVAR_DEFINE(blink_signal);
 K_MUTEX_DEFINE(dispatch_mutex);
 K_CONDVAR_DEFINE(dispatch_signal);
+
 
 
 // Button interrupt handlers
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 0 pressed\n");
+        k_condvar_broadcast(&sequence_signal);
 }
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -106,7 +118,8 @@ void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32
 }
 
 void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
-        printk("Button 4 pressed\n");                  
+        printk("Button 4 pressed\n");
+        k_condvar_broadcast(&blink_signal);                  
 }
 
 int main(void)
@@ -292,30 +305,23 @@ void dispatcher_task(void *, void *, void *) {
                 sequence[sizeof(sequence) - 1] = '\0';
                 printk("Dispatcher: %s\n", sequence);
 
-                for (int i = 0; i < strlen(sequence); i++) {
-                        char ch = toupper((unsigned char)sequence[i]);   // take one character
+                for (int i = 0; i < strlen(sequence); i++) { // Iterate one character at a time
+                        char ch = toupper((unsigned char)sequence[i]);   // Uppercase the character
                         switch (ch) {
                                 case 'R':
-                                        //printk("Turn on red\n", i);
-                                        k_condvar_broadcast(&red_signal);
+                                        k_condvar_broadcast(&red_signal); // Call red task
                                         break;
                                 case 'Y':
-                                        //printk("Turn on yellow\n", i);
-                                        k_condvar_broadcast(&yellow_signal);
-                                        
-                                       // k_condvar_wait(&dispatch_signal, &dispatch_mutex, K_FOREVER);
+                                        k_condvar_broadcast(&yellow_signal); // Call yellow task
                                         break;
                                 case 'G':
-                                        //printk("Turn on green\n", i);
-                                        k_condvar_broadcast(&green_signal);
-
-                                        //k_condvar_wait(&dispatch_signal, &dispatch_mutex, K_FOREVER);
+                                        k_condvar_broadcast(&green_signal); // Call green task
                                         break;
                                 default:
                                         printk("Unknown character\n");
                                         break;
                         }
-                        k_condvar_wait(&dispatch_signal, &dispatch_mutex, K_FOREVER);
+                        k_condvar_wait(&dispatch_signal, &dispatch_mutex, K_FOREVER); // Wait for release signal
                 }
                 k_free(rec_item);
         }
@@ -405,6 +411,51 @@ void green_led_task(void *, void *, void *) {
                 k_sleep(K_SECONDS(1));
                 gpio_pin_set_dt(&green, 0);
                 printk("Green off\n");
+
+                k_condvar_broadcast(&dispatch_signal);
+        }
+}
+
+void sequence_task(void *, void *, void *) {
+        printk("Sequence thread started\n");
+        while (true) {
+                k_condvar_wait(&sequence_signal, &sequence_mutex, K_FOREVER);
+                printk("Go through light sequence 5 times.\n");
+
+                for (int i = 0; i < 5; i++) {
+                        gpio_pin_set_dt(&red, 1);
+                        k_sleep(K_SECONDS(1));
+                        gpio_pin_set_dt(&red, 0);
+
+                        gpio_pin_set_dt(&red, 1);
+                        gpio_pin_set_dt(&green, 1);
+                        k_sleep(K_SECONDS(1));
+                        gpio_pin_set_dt(&red, 0);
+                        gpio_pin_set_dt(&green, 0);
+                        
+                        gpio_pin_set_dt(&green, 1);
+                        k_sleep(K_SECONDS(1));
+                        gpio_pin_set_dt(&green, 0);
+                }
+
+                k_condvar_broadcast(&dispatch_signal);
+        }
+}
+
+void blink_task(void *, void *, void *) {
+        printk("Blink thread started\n");
+        while (true) {
+                k_condvar_wait(&blink_signal, &blink_mutex, K_FOREVER);
+                printk("Blink yellow 5 times.\n");
+
+                for (int i = 0; i < 5; i++) {
+                        gpio_pin_set_dt(&red, 1);
+                        gpio_pin_set_dt(&green, 1);
+                        k_sleep(K_SECONDS(1));
+                        gpio_pin_set_dt(&red, 0);
+                        gpio_pin_set_dt(&green, 0);
+                        k_sleep(K_SECONDS(1));
+                }
 
                 k_condvar_broadcast(&dispatch_signal);
         }
