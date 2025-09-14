@@ -5,6 +5,7 @@
 #include <zephyr/sys/printk.h>
 #include <inttypes.h>
 #include <zephyr/drivers/uart.h>
+#include <ctype.h>
 
 // Initialize thread definitions
 #define STACKSIZE 500
@@ -104,7 +105,18 @@ void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 1 pressed\n");
-        k_condvar_broadcast(&red_signal);
+        //k_condvar_broadcast(&red_signal);
+        char rc = 'R';
+
+        struct data_t *buf = k_malloc(sizeof(struct data_t));
+        if (buf == NULL) {
+                return;
+        }
+
+        snprintf(buf->msg, 20, "%c", rc);
+
+        k_fifo_put(&data_fifo, buf);
+        k_condvar_broadcast(&dispatch_signal);
 }
 
 void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
