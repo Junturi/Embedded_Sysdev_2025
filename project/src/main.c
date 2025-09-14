@@ -70,9 +70,6 @@ K_THREAD_DEFINE(green_thread,STACKSIZE, green_led_task, NULL, NULL, NULL, PRIORI
 void yellow_led_task(void *, void *, void *);
 K_THREAD_DEFINE(yellow_thread,STACKSIZE, yellow_led_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
-void sequence_task(void *, void *, void *);
-K_THREAD_DEFINE(sequence_thread,STACKSIZE, sequence_task, NULL, NULL, NULL, PRIORITY, 0, 0);
-
 void blink_task(void *, void *, void *);
 K_THREAD_DEFINE(blink_thread,STACKSIZE, blink_task, NULL, NULL, NULL, PRIORITY, 0, 0);
 
@@ -88,8 +85,6 @@ K_MUTEX_DEFINE(green_mutex);
 K_CONDVAR_DEFINE(green_signal);
 K_MUTEX_DEFINE(yellow_mutex);
 K_CONDVAR_DEFINE(yellow_signal);
-K_MUTEX_DEFINE(sequence_mutex);
-K_CONDVAR_DEFINE(sequence_signal);
 K_MUTEX_DEFINE(blink_mutex);
 K_CONDVAR_DEFINE(blink_signal);
 K_MUTEX_DEFINE(dispatch_mutex);
@@ -100,12 +95,21 @@ K_CONDVAR_DEFINE(dispatch_signal);
 // Button interrupt handlers
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 0 pressed\n");
-        k_condvar_broadcast(&sequence_signal);
+        char* rc = "RYGYR";
+
+        struct data_t *buf = k_malloc(sizeof(struct data_t));
+        if (buf == NULL) {
+                return;
+        }
+
+        snprintf(buf->msg, 20, "%s", rc);
+
+        k_fifo_put(&data_fifo, buf);
+        k_condvar_broadcast(&dispatch_signal);
 }
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 1 pressed\n");
-        //k_condvar_broadcast(&red_signal);
         char rc = 'R';
 
         struct data_t *buf = k_malloc(sizeof(struct data_t));
@@ -121,12 +125,32 @@ void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 2 pressed\n");
-        k_condvar_broadcast(&yellow_signal);
+        char rc = 'Y';
+
+        struct data_t *buf = k_malloc(sizeof(struct data_t));
+        if (buf == NULL) {
+                return;
+        }
+
+        snprintf(buf->msg, 20, "%c", rc);
+
+        k_fifo_put(&data_fifo, buf);
+        k_condvar_broadcast(&dispatch_signal);
 }
 
 void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 3 pressed\n");
-        k_condvar_broadcast(&green_signal);
+        char rc = 'G';
+
+        struct data_t *buf = k_malloc(sizeof(struct data_t));
+        if (buf == NULL) {
+                return;
+        }
+
+        snprintf(buf->msg, 20, "%c", rc);
+
+        k_fifo_put(&data_fifo, buf);
+        k_condvar_broadcast(&dispatch_signal);
 }
 
 void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -423,32 +447,6 @@ void green_led_task(void *, void *, void *) {
                 k_sleep(K_SECONDS(1));
                 gpio_pin_set_dt(&green, 0);
                 printk("Green off\n");
-
-                k_condvar_broadcast(&dispatch_signal);
-        }
-}
-
-void sequence_task(void *, void *, void *) {
-        printk("Sequence thread started\n");
-        while (true) {
-                k_condvar_wait(&sequence_signal, &sequence_mutex, K_FOREVER);
-                printk("Go through light sequence 5 times.\n");
-
-                for (int i = 0; i < 5; i++) {
-                        gpio_pin_set_dt(&red, 1);
-                        k_sleep(K_SECONDS(1));
-                        gpio_pin_set_dt(&red, 0);
-
-                        gpio_pin_set_dt(&red, 1);
-                        gpio_pin_set_dt(&green, 1);
-                        k_sleep(K_SECONDS(1));
-                        gpio_pin_set_dt(&red, 0);
-                        gpio_pin_set_dt(&green, 0);
-                        
-                        gpio_pin_set_dt(&green, 1);
-                        k_sleep(K_SECONDS(1));
-                        gpio_pin_set_dt(&green, 0);
-                }
 
                 k_condvar_broadcast(&dispatch_signal);
         }
