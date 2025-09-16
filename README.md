@@ -47,3 +47,11 @@ In part one, we added a task to read UART serial port data and save it to FIFO b
 
 
 In part two, we refactored the button functionality. Now button_0 will add a pre-determined sequence (RYGYR) to the FIFO buffer. Buttons 1-3 will add a single letter depending on the color, as in week 1, to the FIFO buffer. These buttons will then signal the dispatcher. Button_4 signals a separate blink_task that will blink the yellow LED five times in a row.
+
+
+
+In part three, we refactored the code again. Now we insert the color and time we want the LED to be turned on, for example:
+'R, 1000'
+will keep the red LED on for 1000 ms.
+
+The same functionality is hard-coded to buttons 1-3, keeping the corresponding LED in for 1000 ms. Button_0 is currently disabled.
