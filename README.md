@@ -51,7 +51,7 @@ In part two, we refactored the button functionality. Now button_0 will add a pre
 
 
 In part three, we refactored the code again. Now we insert the color and time we want the LED to be turned on, for example:
-'R, 1000'
+`R, 1000`
 will keep the red LED on for 1000 ms.
 
-The same functionality is hard-coded to buttons 1-3, keeping the corresponding LED in for 1000 ms. Button_0 is currently disabled.
+The same functionality is hard-coded to buttons 1-3, keeping the corresponding LED on for 1000 ms. Button_0 will send a sequence of `RYGYR` to the FIFO, keeping each LED on for 1000 ms.
