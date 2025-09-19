@@ -55,3 +55,24 @@ In part three, we refactored the code again. Now we insert the color and time we
 will keep the red LED on for 1000 ms.
 
 The same functionality is hard-coded to buttons 1-3, keeping the corresponding LED on for 1000 ms. Button_0 will send a sequence of `RYGYR` to the FIFO, keeping each LED on for 1000 ms.
+
+##Week 4
+
+
+Week 4 we get familiar with timing our programs performance and debugging.
+
+
+
+In part one, we time add timing to our LED tasks and time how long each task takes. The total time for the light sequence is also calculated. We time the program twice: first with debugging prints (for example `printk("Red LED on\n")`) and second time with these prints turned off. Both times we run the same sequence `RYGYR,1`.
+
+
+
+![Screenshot of console, showing the timing of program with debugging prints turned on.](/images/w4p1_timing_prints.png)
+
+Here we can see it takes between 1,4 to 1,9 ms to run one task. The whole sequence takes about 8,5 ms.
+
+
+
+![Screenshot of console, showing the timing of program with debugging prints turned off.](/images/w4p1_timing_no_prints.png)
+
+Removing the prints improves our performance significantly. Now each task takes between 0,6 to 1 ms to run, with the whole sequence taking just 3,7 ms.

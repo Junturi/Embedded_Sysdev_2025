@@ -7,6 +7,7 @@
 #include <zephyr/drivers/uart.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <zephyr/timing/timing.h>
 
 // Initialize thread definitions
 #define STACKSIZE 500
@@ -81,6 +82,7 @@ int initialize_button(void);
 int initialize_leds(void);
 int initialize_uart(void);
 uint32_t sleep_time = 0;
+uint64_t total_sequence_timing = 0;
 
 // Condition Variables
 K_MUTEX_DEFINE(red_mutex);
@@ -178,7 +180,9 @@ void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32
 
 int main(void)
 {
-        // In main, initialize LEDs, buttons, uart
+        // In main, initialize LEDs, buttons, uart and timing
+        timing_init();
+        
         int ret = initialize_uart();
 	if (ret != 0) {
 		printk("UART initialization failed!\n");
@@ -364,7 +368,6 @@ void dispatcher_task(void *, void *, void *) {
                         char ch = toupper((unsigned char)data[i]);
                         switch (ch) {
                                 case 'R':
-                                        printk("Call red signal");
                                         k_condvar_broadcast(&red_signal); // Call red task
                                         break;
                                 case 'Y':
@@ -376,7 +379,7 @@ void dispatcher_task(void *, void *, void *) {
                                 default:
                                         printk("Unknown character\n");
                                         break;
-                }
+                        }
                 k_condvar_wait(&dispatch_signal, &dispatch_mutex, K_FOREVER); // Wait for release signal
                 }
                 k_free(buf);
@@ -432,11 +435,9 @@ void uart_task(void *, void *, void *) {
                                         // Copy characters before the comma to buf->color
                                         strncpy(buf->color, uart_msg, len);
                                         buf->color[len] = '\0';
-                                        printk("BUF color: %s\n", buf->color);
 
                                         // Copy value after comma to buf->time_ms
                                         buf->time_ms = (uint32_t)atoi(comma + 1);
-                                        printk("BUF time: %d\n",buf->time_ms);
 
                                         // Add the data in buf to FIFO
                                         k_fifo_put(&data_fifo, buf);
@@ -459,13 +460,26 @@ void red_led_task(void *, void *, void *) {
                 // Wait until red signal is sent from dispatcher
                 k_condvar_wait(&red_signal, &red_mutex, K_FOREVER);
 
+                timing_start(); // Start timing
+                timing_t start_time = timing_counter_get(); // Get the starting time
+
                 uint32_t time_ms = sleep_time;
 
                 gpio_pin_set_dt(&red, 1); // Set LED on
-                printk("Red on\n");
+                //printk("Red on\n");
                 k_msleep(time_ms);
-                printk("Red off\n");
+                //printk("Red off\n");
                 gpio_pin_set_dt(&red, 0); // Set LED off
+
+                timing_t end_time = timing_counter_get(); // Get the ending time
+                timing_stop(); // Stop timing
+
+                // Calculate how long the task took and print the time
+                uint64_t timing_ns = timing_cycles_to_ns(timing_cycles_get(&start_time, &end_time));
+                printk("Red task: %lld ns\n", timing_ns);
+
+                total_sequence_timing = total_sequence_timing + timing_ns;
+                printk("Total sequence timing: %lld ns\n", total_sequence_timing);
 
                 // Send signal to dispatcher to continue
                 k_condvar_broadcast(&dispatch_signal);
@@ -476,16 +490,28 @@ void yellow_led_task(void *, void *, void *) {
         printk("Yellow LED thread started\n");
         while (true) {
                 k_condvar_wait(&yellow_signal, &yellow_mutex, K_FOREVER);
+
+                timing_start();
+                timing_t start_time = timing_counter_get();
                 
                 uint32_t time_ms = sleep_time;
 
                 gpio_pin_set_dt(&red, 1);
                 gpio_pin_set_dt(&green, 1);
-                printk("Yellow on\n");
+                //printk("Yellow on\n");
                 k_msleep(time_ms);
                 gpio_pin_set_dt(&red, 0);
                 gpio_pin_set_dt(&green, 0);
-                printk("Yellow off\n");
+                //printk("Yellow off\n");
+
+                timing_t end_time = timing_counter_get();
+                timing_stop();
+
+                uint64_t timing_ns = timing_cycles_to_ns(timing_cycles_get(&start_time, &end_time));
+                printk("Yellow task: %lld ns\n", timing_ns);
+
+                total_sequence_timing = total_sequence_timing + timing_ns;
+                printk("Total sequence timing: %lld ns\n", total_sequence_timing);
 
                 k_condvar_broadcast(&dispatch_signal);
         }
@@ -496,15 +522,27 @@ void green_led_task(void *, void *, void *) {
         while (true) {
                 k_condvar_wait(&green_signal, &green_mutex, K_FOREVER);
 
+                timing_start();
+                timing_t start_time = timing_counter_get();
+
                 uint32_t time_ms = sleep_time;
 
                 gpio_pin_set_dt(&green, 1);
-                printk("Green on\n");
+                //printk("Green on\n");
                 k_msleep(time_ms);
                 gpio_pin_set_dt(&green, 0);
-                printk("Green off\n");
+                //printk("Green off\n");
 
                 k_condvar_broadcast(&dispatch_signal);
+
+                timing_t end_time = timing_counter_get();
+                timing_stop();
+
+                uint64_t timing_ns = timing_cycles_to_ns(timing_cycles_get(&start_time, &end_time));
+                printk("Green task: %lld ns\n", timing_ns);
+
+                total_sequence_timing = total_sequence_timing + timing_ns;
+                printk("Total sequence timing: %lld ns\n", total_sequence_timing);
         }
 }
 
