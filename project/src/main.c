@@ -23,7 +23,7 @@ K_THREAD_DEFINE(uart_thread,STACKSIZE, uart_task, NULL, NULL, NULL, PRIORITY, 0,
 // Create struct for FIFO data
 struct data_t {
         void *fifo_reserved;
-        char color;
+        char color[20];
         uint32_t time_ms;
 };
 
@@ -99,6 +99,22 @@ K_CONDVAR_DEFINE(dispatch_signal);
 // Button interrupt handlers
 void button_0_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
         printk("Button 0 pressed\n");
+        struct data_t *buf = k_malloc(sizeof(struct data_t));
+        if (buf == NULL) {
+                return;
+        }
+
+        // Initialize the data buffer
+        memset(buf, 0, sizeof(*buf));
+
+        // Add the data into the buffer
+        const char *msg = "RYGYR";
+        strncpy(buf->color, msg, sizeof(buf->color) -1);
+        buf->time_ms = 1000;
+
+        // Add data from buffer to FIFO
+        k_fifo_put(&data_fifo, buf);
+        k_condvar_broadcast(&dispatch_signal);
 }
 
 void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins) {
@@ -109,7 +125,10 @@ void button_1_handler(const struct device *dev, struct gpio_callback *cb, uint32
                 return;
         }
 
-        buf->color = 'R';
+        memset(buf, 0, sizeof(*buf));
+
+        const char *msg = "R";
+        strncpy(buf->color, msg, sizeof(buf->color) -1);
         buf->time_ms = 1000;
 
         k_fifo_put(&data_fifo, buf);
@@ -124,7 +143,10 @@ void button_2_handler(const struct device *dev, struct gpio_callback *cb, uint32
                 return;
         }
 
-        buf->color = 'Y';
+        memset(buf, 0, sizeof(*buf));
+
+        const char *msg = "Y";
+        strncpy(buf->color, msg, sizeof(buf->color) -1);
         buf->time_ms = 1000;
 
         k_fifo_put(&data_fifo, buf);
@@ -139,7 +161,10 @@ void button_3_handler(const struct device *dev, struct gpio_callback *cb, uint32
                 return;
         }
 
-        buf->color = 'G';
+        memset(buf, 0, sizeof(*buf));
+
+        const char *msg = "G";
+        strncpy(buf->color, msg, sizeof(buf->color) -1);
         buf->time_ms = 1000;
 
         k_fifo_put(&data_fifo, buf);
@@ -329,25 +354,29 @@ void dispatcher_task(void *, void *, void *) {
         while (true) {
                 // Receive dispatcher data from uart_task FIFO
                 struct data_t * buf = k_fifo_get(&data_fifo, K_FOREVER);
-                printk("Dispatcher: %c, %d\n", buf->color, buf->time_ms);
+                printk("Dispatcher: %s, %d\n", buf->color, buf->time_ms);
 
                 sleep_time = buf->time_ms;
 
-                switch (buf->color) {
-                        case 'R':
-                                printk("Call red signal");
-                                k_condvar_broadcast(&red_signal); // Call red task
-                                break;
-                        case 'Y':
-                                k_condvar_broadcast(&yellow_signal); // Call yellow task
-                                break;
-                        case 'G':
-                                k_condvar_broadcast(&green_signal); // Call green task
-                                break;
-                        default:
-                                printk("Unknown character\n");
-                                break;
-                
+                char* data = buf->color;
+
+                for (int i = 0; i < strlen(data); i++) {
+                        char ch = toupper((unsigned char)data[i]);
+                        switch (ch) {
+                                case 'R':
+                                        printk("Call red signal");
+                                        k_condvar_broadcast(&red_signal); // Call red task
+                                        break;
+                                case 'Y':
+                                        k_condvar_broadcast(&yellow_signal); // Call yellow task
+                                        break;
+                                case 'G':
+                                        k_condvar_broadcast(&green_signal); // Call green task
+                                        break;
+                                default:
+                                        printk("Unknown character\n");
+                                        break;
+                }
                 k_condvar_wait(&dispatch_signal, &dispatch_mutex, K_FOREVER); // Wait for release signal
                 }
                 k_free(buf);
@@ -358,19 +387,28 @@ void dispatcher_task(void *, void *, void *) {
 void uart_task(void *, void *, void *) {
         char rc=0;
         char uart_msg[20];
-        memset(uart_msg, 0, 20);
+        memset(uart_msg, 0, sizeof(uart_msg));
         int uart_msg_count = 0;
 
 	while (true) {
 		// Ask UART if data available
-		if (uart_poll_in(uart_dev,&rc) == 0) {
-                        // If character is not newline, add to UART message buffer
+		if (uart_poll_in(uart_dev, &rc) == 0) {
+                        // If character is not newline
                         if (rc != '\r') {
-                                uart_msg[uart_msg_count] = rc;
-                                uart_msg_count++;
+                                if (uart_msg_count < sizeof(uart_msg) - 1) {
+                                uart_msg[uart_msg_count++] = rc;
+                                }
+                                else {
+                                // If the message is longer than 20 characters, overflow and reset
+                                printk("UART buffer overflow, clearing\n");
+                                uart_msg_count = 0;
+                                memset(uart_msg, 0, sizeof(uart_msg));
+                                }
                         }
                         // If character is newline, copy dispatcher data and put to FIFO buffer
                         else {
+                                uart_msg[uart_msg_count] = '\0';
+
                                 printk("UART msg: %s\n", uart_msg);
 
                                 struct data_t *buf = k_malloc(sizeof(struct data_t));
@@ -378,12 +416,32 @@ void uart_task(void *, void *, void *) {
                                         return;
                                 }
 
-                                // Parse the UART data
-                                buf->color = toupper((unsigned char)uart_msg[0]);   // Uppercase the character
-                                buf->time_ms = atoi(uart_msg+2);
+                                // Find the comma in the UART message
+                                char *comma = strchr(uart_msg, ',');
+                                if (!comma) {
+                                        printk("Invalid message format\n");
+                                        k_free(buf);
+                                }
 
-                                k_fifo_put(&data_fifo, buf);
-                                printk("Data added to FIFO: %c, %d\n", buf->color, buf->time_ms);
+                                else {
+                                        size_t len = comma - uart_msg;
+                                        if (len >= sizeof(buf->color)) {
+                                                len = sizeof(buf->color) - 1;
+                                        }
+                                        
+                                        // Copy characters before the comma to buf->color
+                                        strncpy(buf->color, uart_msg, len);
+                                        buf->color[len] = '\0';
+                                        printk("BUF color: %s\n", buf->color);
+
+                                        // Copy value after comma to buf->time_ms
+                                        buf->time_ms = (uint32_t)atoi(comma + 1);
+                                        printk("BUF time: %d\n",buf->time_ms);
+
+                                        // Add the data in buf to FIFO
+                                        k_fifo_put(&data_fifo, buf);
+                                        printk("Data added to FIFO: %s, %d\n", buf->color, buf->time_ms);
+                                }
 
                                 // Clear UART message buffer
                                 uart_msg_count = 0;
