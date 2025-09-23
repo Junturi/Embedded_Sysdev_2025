@@ -76,3 +76,7 @@ Here we can see it takes between 1,4 to 1,9 ms to run one task. The whole sequen
 ![Screenshot of console, showing the timing of program with debugging prints turned off.](/images/w4p1_timing_no_prints.png)
 
 Removing the prints improves our performance significantly. Now each task takes between 0,6 to 1 ms to run, with the whole sequence taking just 3,7 ms.
+
+
+
+In part two, we add a separat debug-task to handle the printing of debug data. Now the UART-message, dispatcher parsed data and timing of tasks is printed only from the debug task.
