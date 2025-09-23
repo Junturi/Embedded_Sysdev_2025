@@ -56,7 +56,7 @@ will keep the red LED on for 1000 ms.
 
 The same functionality is hard-coded to buttons 1-3, keeping the corresponding LED on for 1000 ms. Button_0 will send a sequence of `RYGYR` to the FIFO, keeping each LED on for 1000 ms.
 
-##Week 4
+## Week 4
 
 
 Week 4 we get familiar with timing our programs performance and debugging.
