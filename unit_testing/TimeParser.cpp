@@ -1,16 +1,30 @@
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "TimeParser.h"
 
-// time format: HHMMSS (6 characters)
+// Time format: HHMMSS (6 characters)
 int time_parse(char *time) {
 
-	// how many seconds, default returns error
+	// How many seconds, default returns error
 	int seconds = TIME_LEN_ERROR;
 
-	// TODO: Check that string is not null
+	// Check that string is not null
 	if (!time) {
 		return TIME_ARRAY_ERROR;
+	}
+
+	// Check that string is 6 characters long
+	if (strlen(time) != 6) {
+		return TIME_ARRAY_ERROR;
+	}
+
+	// Check that the string contains only numerical values
+	// Will also automatically fail any negative values
+	for (int i = 0; i < 6; i++) {
+		if (!isdigit((unsigned char)time[i])) {
+			return TIME_VALUE_ERROR;
+		}
 	}
 
 	// Parse values from time string
@@ -26,22 +40,21 @@ int time_parse(char *time) {
 	// values[1] minute
 	// values[2] second
 
-	// TODO: Add boundary check time values: below zero or above limit not allowed
-	// limits are 59 for minutes, 23 for hours, etc
-	if (values[2] < 0 || values[2] > 59) {
+	// Check that parsed times are valid: above limit not allowed
+	// Limits are 59 for minutes, 23 for hours, etc
+	if (values[2] > 59) {
 		return TIME_VALUE_ERROR;
 	}
 
-	if (values[1] < 0 || values[1] > 59) {
+	if (values[1] > 59) {
 		return TIME_VALUE_ERROR;
 	}
 
-	if (values[0] < 0 || values[0] > 23){
+	if (values[0] > 23){
 		return TIME_VALUE_ERROR;
 	}
 
-	// TODO: Calculate return value from the parsed minutes and seconds
-	// Otherwise error will be returned!
+	// Calculate return value from the parsed minutes and seconds
 	seconds = values[0]*60*60 + values[1]*60 + values[2];
 
 	return seconds;

@@ -13,6 +13,17 @@ TEST(TimeParserTest, TestCaseNullPointer) {
     ASSERT_EQ(time_parse(nullptr),TIME_ARRAY_ERROR);
 }
 
+// Test for time length
+TEST(TimeParserTest, TestCaseTimeLength) {
+    char time_test[] = "11022";
+    ASSERT_EQ(time_parse(time_test), TIME_ARRAY_ERROR);
+}
+
+TEST(TimeParserTest, TestCaseIsDigit) {
+    char time_test[] = "12A503";
+    ASSERT_EQ(time_parse(time_test), TIME_VALUE_ERROR);
+}
+
 // Test with incorrect time
 TEST(TimeParserTest, TestCaseIncorrectSeconds) {
     char time_test[] = "141265";
@@ -26,21 +37,5 @@ TEST(TimeParserTest, TestCaseIncorrectMinutes) {
 
 TEST(TimeParserTest, TestCaseIncorrectHours) {
     char time_test[] = "301205";
-    ASSERT_EQ(time_parse(time_test),TIME_VALUE_ERROR);
-}
-
-// Test with negative values
-TEST(TimeParserTest, TestCaseNegativeSecond) {
-    char time_test[] = "1412-5";
-    ASSERT_EQ(time_parse(time_test),TIME_VALUE_ERROR);
-}
-
-TEST(TimeParserTest, TestCaseNegativeMinutes) {
-    char time_test[] = "14-205";
-    ASSERT_EQ(time_parse(time_test),TIME_VALUE_ERROR);
-}
-
-TEST(TimeParserTest, TestCaseNegativeHours) {
-    char time_test[] = "-41205";
     ASSERT_EQ(time_parse(time_test),TIME_VALUE_ERROR);
 }
