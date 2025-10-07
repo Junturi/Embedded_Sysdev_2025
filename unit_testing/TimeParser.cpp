@@ -57,5 +57,9 @@ int time_parse(char *time) {
 	// Calculate return value from the parsed minutes and seconds
 	seconds = values[0]*60*60 + values[1]*60 + values[2];
 
+	if (seconds == 0) {
+		return TIME_VALUE_ERROR;
+	}
+
 	return seconds;
 }
