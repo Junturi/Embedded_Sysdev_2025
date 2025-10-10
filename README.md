@@ -80,3 +80,6 @@ Removing the prints improves our performance significantly. Now each task takes 
 
 
 In part two, we add a separat debug-task to handle the printing of debug data. Now the UART-message, dispatcher parsed data and timing of tasks is printed only from the debug task.
+
+
+In part three, additional debugging prints and timing of other parts of the program were added. Debug-task will now print out the time taken by the uart-task and dispatcher-task.
