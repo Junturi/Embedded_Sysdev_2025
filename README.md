@@ -98,3 +98,22 @@ After the [TimeParser.cpp](unit_testing/TimeParser.cpp)-file is modified, we wri
 ![Screenshot of terminal, showing the tests run. All 8 tests were successful](/images/w5p1_simple_tests.png)
 
 Above we can see that all 8 tests were successful.
+
+
+In part two, we add more test cases to [TimeParserTest.cpp](unit_testing/test_cases/TimeParserTest.cpp). After writing the tests, we add functionality to [TimeParser.cpp](unit_testing/TimeParser.cpp) so that the tests will pass. The previous tests were refactored to use `EXPECT_EQ` instead of `ASSERT_EQ`. Each test unit now includes both test for valid and invalid input. Tests of similar functionality were grouped under one test case (for example testing invalid second, minute and hour values).
+The additional tests are:
+- Is the input 6 characters long
+- Is the return value > 0
+- Is the input only digits
+
+
+In part three, we add additional test suite [UartParserTest.cpp](unit_testing/test_cases/UartParserTest.cpp) and write tests for UART message parsing. We test for simple cases of:
+- Does the message include a comma
+- Does the message contain only letters G, Y or R and numbers
+- Is the time parsed from the message not negative
+
+![Screenshot of terminal, showing the tests run. All 10 tests were successful](/images/w5p1_time_and_uart_parser_tests.png)
+
+Above we can see that all 10 tests were succesful.
+
+Finally, both the TimeParser and UartParser were implemented in our project.
