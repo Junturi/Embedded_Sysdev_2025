@@ -13,9 +13,11 @@ add_subdirectory(googletest)
 
 set(Headers
 	TimeParser.h
+	UartParser.h
 )
 set(Sources
 	TimeParser.cpp
+	UartParser.cpp
 )
 
 add_library(${This} STATIC ${Sources} ${Headers})

@@ -6,6 +6,7 @@ set (This TimeParserTest)
 
 set(Sources
 	TimeParserTest.cpp
+	UartParserTest.cpp
 )
 
 include(CTest)
