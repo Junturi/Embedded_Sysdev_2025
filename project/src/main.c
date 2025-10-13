@@ -13,6 +13,11 @@
 #define STACKSIZE 500
 #define PRIORITY 5
 
+// Timer intialization
+int timer_delay = 0;
+struct k_timer timer;
+void timer_handler(struct k_timer *timer_id);
+
 // Configure UART
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
 static const struct device *const uart_dev = DEVICE_DT_GET(UART_DEVICE_NODE);
@@ -97,6 +102,16 @@ int initialize_button(void);
 int initialize_leds(void);
 int initialize_uart(void);
 uint32_t sleep_time = 0;
+
+#define TIME_LEN_ERROR      -1
+#define TIME_ARRAY_ERROR    -2
+#define TIME_VALUE_ERROR    -3
+int time_parse(char *time);
+
+#define STRING_FORMAT_ERROR     -4
+#define UNKNOWN_CHAR_ERROR      -5
+#define UART_TIME_ERROR        -6
+//data_t uart_parse(char* input);
 
 // Condition Variables
 K_MUTEX_DEFINE(red_mutex);
@@ -192,10 +207,17 @@ void button_4_handler(const struct device *dev, struct gpio_callback *cb, uint32
         k_condvar_broadcast(&blink_signal);                  
 }
 
+// Timer interrupt handler
+void timer_handler(struct k_timer *timer_id) {
+        printk("Single-shot timer!\n");
+}
+
 int main(void)
 {
         // In main, initialize LEDs, buttons, uart and timing
         timing_init();
+
+        k_timer_init(&timer, timer_handler, NULL);
         
         int ret = initialize_uart();
 	if (ret != 0) {
@@ -446,59 +468,72 @@ void uart_task(void *, void *, void *) {
                                 memset(uart_msg, 0, sizeof(uart_msg));
                                 }
                         }
-                        // If character is newline, copy dispatcher data and put to FIFO buffer
+                        // If character is newline
                         else {
-                                uart_msg[uart_msg_count] = '\0';
-
-                                struct data_t *buf = k_malloc(sizeof(struct data_t));
-                                if (buf == NULL) {
-                                        return;
-                                }
-
-                                // Find the comma in the UART message
-                                char *comma = strchr(uart_msg, ',');
-                                if (!comma) {
-                                        printk("Invalid message format\n");
-                                        k_free(buf);
-                                }
-
-                                else {
-                                        size_t len = comma - uart_msg;
-                                        if (len >= sizeof(buf->color)) {
-                                                len = sizeof(buf->color) - 1;
-                                        }
+                                // Check if first character is a digit, meaning that UART msg is
+                                // the time for timer interrupt
+                                if (isdigit(uart_msg[0])) {
+                                        timer_delay = time_parse(uart_msg);
+                                        k_timer_start(&timer, K_SECONDS(timer_delay), K_SECONDS(0));
                                         
-                                        // Copy characters before the comma to buf->color
-                                        strncpy(buf->color, uart_msg, len);
-                                        buf->color[len] = '\0';
-
-                                        // Copy value after comma to buf->time_ms
-                                        buf->time_ms = (uint32_t)atoi(comma + 1);
-
-                                        // Add the data in buf to FIFO
-                                        k_fifo_put(&data_fifo, buf);
+                                        // Clear UART message buffer
+                                        uart_msg_count = 0;
+                                        memset(uart_msg, 0, 20);
                                 }
+                                else {
+                                        // Else, copy dispatcher data and put to FIFO buffer
+                                        uart_msg[uart_msg_count] = '\0';
 
-                                struct debug_t *d_buf = k_malloc(sizeof(struct debug_t));
-                                if (d_buf == NULL) {
-                                        return;
+                                        struct data_t *buf = k_malloc(sizeof(struct data_t));
+                                        if (buf == NULL) {
+                                                return;
+                                        }
+
+                                        // Find the comma in the UART message
+                                        char *comma = strchr(uart_msg, ',');
+                                        if (!comma) {
+                                                printk("Invalid message format\n");
+                                                k_free(buf);
+                                        }
+
+                                        else {
+                                                size_t len = comma - uart_msg;
+                                                if (len >= sizeof(buf->color)) {
+                                                        len = sizeof(buf->color) - 1;
+                                                }
+                                                
+                                                // Copy characters before the comma to buf->color
+                                                strncpy(buf->color, uart_msg, len);
+                                                buf->color[len] = '\0';
+
+                                                // Copy value after comma to buf->time_ms
+                                                buf->time_ms = (uint32_t)atoi(comma + 1);
+
+                                                // Add the data in buf to FIFO
+                                                k_fifo_put(&data_fifo, buf);
+                                        }
+
+                                        struct debug_t *d_buf = k_malloc(sizeof(struct debug_t));
+                                        if (d_buf == NULL) {
+                                                return;
+                                        }
+
+                                        memset(d_buf, 0, sizeof(*d_buf));
+
+                                        timing_t end_time = timing_counter_get();
+                                        timing_stop();
+
+                                        uint64_t timing_ns = timing_cycles_to_ns(timing_cycles_get(&start_time, &end_time));
+
+                                        snprintf(d_buf->msg, sizeof(d_buf->msg), "UART message received: %s", uart_msg);
+                                        d_buf->task_name = "UART";
+                                        d_buf->time_ns = timing_ns;
+                                        k_fifo_put(&debug_fifo, d_buf);
+
+                                        // Clear UART message buffer
+                                        uart_msg_count = 0;
+                                        memset(uart_msg, 0, 20);
                                 }
-
-                                memset(d_buf, 0, sizeof(*d_buf));
-
-                                timing_t end_time = timing_counter_get();
-                                timing_stop();
-
-                                uint64_t timing_ns = timing_cycles_to_ns(timing_cycles_get(&start_time, &end_time));
-
-                                snprintf(d_buf->msg, sizeof(d_buf->msg), "UART message received: %s", uart_msg);
-                                d_buf->task_name = "UART";
-                                d_buf->time_ns = timing_ns;
-                                k_fifo_put(&debug_fifo, d_buf);
-
-                                // Clear UART message buffer
-                                uart_msg_count = 0;
-                                memset(uart_msg, 0, 20);
                         }
 		}
 		k_msleep(10);
@@ -653,3 +688,120 @@ void debug_task(void *, void *, void *) {
                 k_yield();
         }
 }
+
+int time_parse(char *time) {
+
+	// How many seconds, default returns error
+	int seconds = TIME_LEN_ERROR;
+
+	// Check that string is not null
+	if (!time) {
+		return TIME_ARRAY_ERROR;
+	}
+
+	// Check that string is 6 characters long
+	if (strlen(time) != 6) {
+		return TIME_ARRAY_ERROR;
+	}
+
+	// Check that the string contains only numerical values
+	// Will also automatically fail any negative values
+	for (int i = 0; i < 6; i++) {
+		if (!isdigit((unsigned char)time[i])) {
+			return TIME_VALUE_ERROR;
+		}
+	}
+
+	// Parse values from time string
+	// For example: 124033 -> 12hour 40min 33sec
+    int values[3];
+	values[2] = atoi(time+4); // seconds
+	time[4] = 0;
+	values[1] = atoi(time+2); // minutes
+	time[2] = 0;
+	values[0] = atoi(time); // hours
+	// Now you have:
+	// values[0] hour
+	// values[1] minute
+	// values[2] second
+
+	// Check that parsed times are valid: above limit not allowed
+	// Limits are 59 for minutes, 23 for hours, etc
+	if (values[2] > 59) {
+		return TIME_VALUE_ERROR;
+	}
+
+	if (values[1] > 59) {
+		return TIME_VALUE_ERROR;
+	}
+
+	if (values[0] > 23){
+		return TIME_VALUE_ERROR;
+	}
+
+	// Calculate return value from the parsed minutes and seconds
+	seconds = values[0]*60*60 + values[1]*60 + values[2];
+
+	if (seconds == 0) {
+		return TIME_VALUE_ERROR;
+	}
+
+	return seconds;
+}
+
+/*
+data_t uart_parse(char* input){
+    data_t *buf = (data_t *)malloc(sizeof(data_t));
+    if (buf == NULL) {
+        // handle allocation failure
+        data_t dummy = {"", 0};
+        return dummy;
+    }
+
+    char *comma = strchr(input, ',');
+    if (comma == NULL) {
+        char* error_msg = "STRING_FORMAT_ERROR";
+        size_t len = strlen(error_msg);
+        strncpy(buf->color, error_msg, len);
+        buf->color[len] = '\0';   
+        buf->time_ms = STRING_FORMAT_ERROR;
+        return *buf;
+    }
+
+    size_t len = comma - input;
+    if (len >= sizeof(buf->color)) {
+        len = sizeof(buf->color) - 1;
+    }
+
+    for (int i = 0; i < len; i++) {
+        if (toupper((unsigned char)input[i]) != 'G' && 
+            toupper((unsigned char)input[i]) != 'R' && 
+            toupper((unsigned char)input[i]) != 'Y') {
+
+            char* error_msg = "UNKNOWN_CHAR_ERROR";
+            size_t len = strlen(error_msg);
+            strncpy(buf->color, error_msg, len);
+            buf->color[len] = '\0';   
+            buf->time_ms = UNKNOWN_CHAR_ERROR;
+            return *buf;
+            }
+    }
+
+    strncpy(buf->color, input, len);
+    buf->color[len] = '\0';
+
+    int parsed_time = atoi(comma + 1);
+    if (parsed_time < 0) {
+        char* error_msg = "TIME_VALUE_ERROR";
+        size_t len = strlen(error_msg);
+        strncpy(buf->color, error_msg, len);
+        buf->color[len] = '\0';   
+        buf->time_ms = TIME_VALUE_ERROR;
+        return *buf;
+    }
+
+    buf->time_ms = (uint32_t)parsed_time;
+
+    return *buf;
+}
+*/
