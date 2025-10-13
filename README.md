@@ -79,6 +79,9 @@ Removing the prints improves our performance significantly. Now each task takes 
 In part two, we add a separat debug-task to handle the printing of debug data. Now the UART-message, dispatcher parsed data and timing of tasks is printed only from the debug task.
 
 
+In part three, additional debugging prints and timing of other parts of the program were added. Debug-task will now print out the time taken by the uart-task and dispatcher-task.
+
+
 ## Week 5
 
 Week 5 we start unit testing with GoogleTest. All the test code can be found in the [unit_test folder](unit_testing/)
@@ -116,4 +119,4 @@ In part three, we add additional test suite [UartParserTest.cpp](unit_testing/te
 
 Above we can see that all 10 tests were succesful.
 
-Finally, both the TimeParser and UartParser were implemented in our project.
+Finally, both the TimeParser was implemented in the traffic lights project. I ran into issues while implementing the UartParser and it has not been implemented so far.
