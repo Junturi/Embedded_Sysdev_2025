@@ -1,0 +1,4 @@
+install-requires==0.3.0
+pyserial==3.5
+robotframework==7.3.2
+robotframework-seriallibrary==0.4.3

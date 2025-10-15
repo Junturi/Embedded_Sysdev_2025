@@ -714,7 +714,7 @@ int time_parse(char *time) {
 
 	// Parse values from time string
 	// For example: 124033 -> 12hour 40min 33sec
-    int values[3];
+        int values[3];
 	values[2] = atoi(time+4); // seconds
 	time[4] = 0;
 	values[1] = atoi(time+2); // minutes
@@ -728,14 +728,17 @@ int time_parse(char *time) {
 	// Check that parsed times are valid: above limit not allowed
 	// Limits are 59 for minutes, 23 for hours, etc
 	if (values[2] > 59) {
+                printk("%dX\n",TIME_VALUE_ERROR);
 		return TIME_VALUE_ERROR;
 	}
 
 	if (values[1] > 59) {
+                printk("%dX\n",TIME_VALUE_ERROR);
 		return TIME_VALUE_ERROR;
 	}
 
 	if (values[0] > 23){
+                printk("%dX\n",TIME_VALUE_ERROR);
 		return TIME_VALUE_ERROR;
 	}
 
@@ -745,6 +748,8 @@ int time_parse(char *time) {
 	if (seconds == 0) {
 		return TIME_VALUE_ERROR;
 	}
+
+        printk("%dX\n",seconds);
 
 	return seconds;
 }

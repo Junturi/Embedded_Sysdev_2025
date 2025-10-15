@@ -4,3 +4,10 @@
 
 # build
 **/build*/
+
+# venv
+**/.env
+
+# .xml and .html
+robot_framework/*.xml
+robot_framework/*.html
