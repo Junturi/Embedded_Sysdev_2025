@@ -474,8 +474,15 @@ void uart_task(void *, void *, void *) {
                                 // the time for timer interrupt
                                 if (isdigit(uart_msg[0])) {
                                         timer_delay = time_parse(uart_msg);
-                                        k_timer_start(&timer, K_SECONDS(timer_delay), K_SECONDS(0));
-                                        
+                                        printk("%dX\n",timer_delay);
+
+                                        if (timer_delay > 0) {
+                                                k_timer_start(&timer, K_SECONDS(timer_delay), K_SECONDS(0));
+                                        }
+                                        else {
+                                                printk("Invalid time\n");
+                                        }
+
                                         // Clear UART message buffer
                                         uart_msg_count = 0;
                                         memset(uart_msg, 0, 20);
@@ -728,17 +735,14 @@ int time_parse(char *time) {
 	// Check that parsed times are valid: above limit not allowed
 	// Limits are 59 for minutes, 23 for hours, etc
 	if (values[2] > 59) {
-                printk("%dX\n",TIME_VALUE_ERROR);
 		return TIME_VALUE_ERROR;
 	}
 
 	if (values[1] > 59) {
-                printk("%dX\n",TIME_VALUE_ERROR);
 		return TIME_VALUE_ERROR;
 	}
 
 	if (values[0] > 23){
-                printk("%dX\n",TIME_VALUE_ERROR);
 		return TIME_VALUE_ERROR;
 	}
 
@@ -748,8 +752,6 @@ int time_parse(char *time) {
 	if (seconds == 0) {
 		return TIME_VALUE_ERROR;
 	}
-
-        printk("%dX\n",seconds);
 
 	return seconds;
 }

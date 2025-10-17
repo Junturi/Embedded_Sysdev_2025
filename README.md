@@ -132,3 +132,13 @@ Week 6 we dip our toes into test automation with Robot Framework. Robot Framewor
 In part one, we want to test our `time_parse` function. We start by creating two test cases in [tests.robot](robot_framework/tests.robot). We test for correct and incorrect time by sending a sequence via COM9 port. The nRF board will receive the sequence and send back a response via the same port. This response is then compared to our expected response. If they match, the test will pass.
 
 
+In part two, we add more test cases. Now we have five different tests:
+- Is the time parsed and seconds calculated correctly
+- Is the parsed seconds, minutes and hours valid
+- Is the return value > 0
+- Is the input only digits
+- Is the input 6 characters long
+
+![Screenshot of terminal, showing the tests run. All 7 tests were successful](/images/w6p2_test_results)
+
+Above we can see that all 7 tests were succesfull.
