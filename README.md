@@ -119,4 +119,26 @@ In part three, we add additional test suite [UartParserTest.cpp](unit_testing/te
 
 Above we can see that all 10 tests were succesful.
 
-Finally, both the TimeParser was implemented in the traffic lights project. I ran into issues while implementing the UartParser and it has not been implemented so far.
+Finally, the function `time_parse` from TimeParser was implemented in the traffic lights project. I ran into issues while implementing the UartParser and it has not been implemented so far.
+
+
+
+## Week 6
+
+
+Week 6 we dip our toes into test automation with Robot Framework. Robot Framework uses Python, and all dependencies can be installed easily with `pip install -r requirements.txt`. It is recommended to use virtual enviroments. The `requirements.txt` file, alongside with all the Robot Framework tests, can be found in [robot_framework folder](robot_framework/)
+
+
+In part one, we want to test our `time_parse` function. We start by creating two test cases in [tests.robot](robot_framework/tests.robot). We test for correct and incorrect time by sending a sequence via COM9 port. The nRF board will receive the sequence and send back a response via the same port. This response is then compared to our expected response. If they match, the test will pass.
+
+
+In part two, we add more test cases. Now we have five different tests:
+- Is the time parsed and seconds calculated correctly
+- Is the parsed seconds, minutes and hours valid
+- Is the return value > 0
+- Is the input only digits
+- Is the input 6 characters long
+
+![Screenshot of terminal, showing the tests run. All 7 tests were successful](/images/w6p2_test_results)
+
+Above we can see that all 7 tests were succesfull.

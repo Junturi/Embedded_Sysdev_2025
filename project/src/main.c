@@ -474,8 +474,15 @@ void uart_task(void *, void *, void *) {
                                 // the time for timer interrupt
                                 if (isdigit(uart_msg[0])) {
                                         timer_delay = time_parse(uart_msg);
-                                        k_timer_start(&timer, K_SECONDS(timer_delay), K_SECONDS(0));
-                                        
+                                        printk("%dX\n",timer_delay);
+
+                                        if (timer_delay > 0) {
+                                                k_timer_start(&timer, K_SECONDS(timer_delay), K_SECONDS(0));
+                                        }
+                                        else {
+                                                printk("Invalid time\n");
+                                        }
+
                                         // Clear UART message buffer
                                         uart_msg_count = 0;
                                         memset(uart_msg, 0, 20);
@@ -714,7 +721,7 @@ int time_parse(char *time) {
 
 	// Parse values from time string
 	// For example: 124033 -> 12hour 40min 33sec
-    int values[3];
+        int values[3];
 	values[2] = atoi(time+4); // seconds
 	time[4] = 0;
 	values[1] = atoi(time+2); // minutes
